@@ -7,6 +7,8 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from openpyxl import Workbook
 import base64
+import os
+import shutil
 
 # ==================== CẤU HÌNH GIAO DIỆN ====================
 st.set_page_config(page_title="Trình thu thập dữ liệu Google Maps", page_icon="", layout="wide")
@@ -122,13 +124,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================== HÀM CRAWL GOOGLE MAPS ====================
-def crawl_google_maps(query):
+def _create_webdriver():
     options = webdriver.ChromeOptions()
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
-    # LƯU Ý: Nếu chạy trên môi trường không có kết nối internet hoặc không cài đặt Chrome/Chromedriver, dòng này có thể gây lỗi.
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    # Thử cách tiêu chuẩn với webdriver-manager (tốt cho local dev)
+    try:
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        return driver
+    except Exception:
+        pass
+
+    # Fallback cho môi trường Streamlit Cloud dùng Chromium + Chromedriver từ hệ thống
+    chromium_binary = shutil.which("chromium") or shutil.which("chromium-browser")
+    if chromium_binary:
+        options.binary_location = chromium_binary
+
+    chromedriver_path = shutil.which("chromedriver") or "/usr/bin/chromedriver"
+    service = Service(chromedriver_path)
+    driver = webdriver.Chrome(service=service, options=options)
+    return driver
+
+
+def crawl_google_maps(query):
+    driver = _create_webdriver()
 
     st.info("Đang mở Google Maps...")
     driver.get(f"https://www.google.com/maps/search/{query}")
